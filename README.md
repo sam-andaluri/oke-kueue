@@ -18,6 +18,9 @@
 1. [uv](https://docs.astral.sh/uv/getting-started/installation/) is the package manager used for this project.
 2. When adding new or removing dependencies use the following commands as an example
    ```
+   #Run this when you cloned this repo first time
+   uv pip compile pyproject.toml -o requirements.txt
+   #During active development
    uv add prometheus_client
    uv remove prometheus-api-client
    uv pip compile pyproject.toml -o requirements.txt
@@ -41,7 +44,11 @@
 1. Modify the `k8s-backend.template` to specify the image repo and image tag.
 2. Generate secret and manifest all example objects.
     ```
-    DOCKER_CONF_JSON_BASE64=`cat ~/.docker/config.json | base64`
+    #use either Podman or Docker not both
+    #Podman
+    export DOCKER_CONF_JSON_BASE64=`cat ~/.config/containers/auth.json | base64`
+    #Docker
+    export DOCKER_CONF_JSON_BASE64=`cat ~/.docker/config.json | base64`
     sed -e "s/DOCKER_CONF_JSON_BASE64/$DOCKER_CONF_JSON_BASE64/g" k8s-backend.template > k8s-backend.yaml
     ```
  3. Deploy app `kubectl apply -f k8s-backend.yaml`
@@ -58,20 +65,20 @@
 
     ```
     LOADBALANCER_IP=`kubectl get service backend-kueue-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`
-	  curl -s http://${LOADBALANCER_IP}/health | jq -r '.status=="ok"'
+	 curl -s http://$LOADBALANCER_IP/health | jq -r '.status=="ok"'
     ```
 
     ```
-    curl http://${LOADBALANCER_IP}/
+    curl http://$LOADBALANCER_IP/
     {"message":"Hello from FastAPI and Gunicorn!"}
 
-    curl http://${LOADBALANCER_IP}/health
+    curl http://$LOADBALANCER_IP/health
     {"status":"ok"}    
     ```
   6. Submit a kueue job via FastAPI
 
     ```
-    curl -X POST http://${LOADBALANCER_IP}/submit-job
+    curl -X POST http://$LOADBALANCER_IP/submit-job
     {"status":"submitted","queue":"local-queue","job":"job-c5k6l"}    
     ```
   7. Submit a kueue job using manifest `kubectl apply -f sample-job.yaml`
@@ -98,6 +105,12 @@ kubectl port-forward -n kueue-system svc/kueue-controller-manager-metrics-servic
 curl -k https://localhost:8443/metrics -H "Authorization: Bearer $TOKEN"
 ```
 5. See `app.py` file and `get_prometheus_metric` method for an example that accesses the metrics programmatically. This file also includes a method `create_deployment` for creating a deployment and `scale_deployment` for writing custom scaling algorithm.
+
+### Cleanup workloads and jobs
+```
+kubectl delete workloads --all
+kubectl delete jobs --all
+``` 
 
 ### Horizontal Pod Autoscaler (HPA) integration
 ![diagram](images/HPACustomMetrics.png)

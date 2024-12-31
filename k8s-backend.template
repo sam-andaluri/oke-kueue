@@ -1,3 +1,11 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kueue-regcred
+data:
+  .dockerconfigjson: DOCKER_CONF_JSON_BASE64
+type: kubernetes.io/dockerconfigjson
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -44,15 +52,6 @@ spec:
   ports:
     - port: 80
       targetPort: 8081
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: kueue-regcred
-data:
-  .dockerconfigjson: DOCKER_CONF_JSON_BASE64
-type: kubernetes.io/dockerconfigjson
-
 ---
 apiVersion: v1
 kind: ServiceAccount
