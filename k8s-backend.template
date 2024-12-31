@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-kueue
+  labels:
+    app: backend-kueue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-kueue
+  template:
+    metadata:
+      labels:
+        app: backend-kueue
+    spec:
+      serviceAccountName: backend-kueue
+      containers:
+        - name: backend
+          image: phx.ocir.io/hpc_limited_availability/test:backend-kueue
+          imagePullPolicy: Always
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+          ports:
+            - containerPort: 8081
+      imagePullSecrets:
+        - name: kueue-regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-kueue-service
+  labels:
+    app: backend-kueue
+spec:
+  type: LoadBalancer
+  selector:
+    app: backend-kueue
+  ports:
+    - port: 80
+      targetPort: 8081
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kueue-regcred
+data:
+  .dockerconfigjson: DOCKER_CONF_JSON_BASE64
+type: kubernetes.io/dockerconfigjson
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backend-kueue
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: backend-kueue
+rules:
+  - apiGroups:
+      - ""
+      - "apps"
+      - "batch"
+    resources:
+      - endpoints
+      - deployments
+      - pods
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - delete
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: backend-kueue
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: backend-kueue
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: backend-kueue

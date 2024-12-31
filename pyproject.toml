@@ -1,0 +1,15 @@
+[project]
+name = "fastapi-oke-kueue"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi==0.103.2",
+    "gunicorn==22.0.0",
+    "kubernetes==26.1.0",
+    "prometheus-client>=0.21.1",
+    "requests>=2.32.3",
+    "urllib3>=2.3.0",
+    "uvicorn==0.22.0",
+]
