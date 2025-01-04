@@ -7,25 +7,21 @@ prometheus:
 rules:
   default: true
 
-  custom: []
-    # - seriesQuery: '{__name__=~"^some_metric_count$"}'
-    #   resources:
-    #     template: <<.Resource>>
-    #   name:
-    #     matches: ""
-    #     as: "my_custom_metric"
-    #   metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)
+  custom: 
+    - seriesQuery: '{__name__=~"^fastapi_inprogress_requests_total$"}'
+      resources:
+        template: <<.Resource>>
+      name:
+        matches: ""
+        as: "fastapi_custom_metric"
+      metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)
 
-  # Mounts a configMap with pre-generated rules for use. Overrides the
-  # default, custom, external and resource entries
-  existing:
-
-  external: []
-    # - seriesQuery: '{__name__=~"^some_metric_count$"}'
-    #   resources:
-    #     template: <<.Resource>>
-    #   name:
-    #     matches: ""
-    #     as: "my_external_metric"
-    #   metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)
+  external:
+    - seriesQuery: '{__name__=~"^kueue_pending_workloads$"}'
+      resources:
+        template: <<.Resource>>
+      name:
+        matches: ""
+        as: "kueue_external_metric"
+      metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)
 

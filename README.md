@@ -105,6 +105,11 @@
 ```
    curl -s http://$LOADBALANCER_IP/metrics/
 ```
+3. Test to see if Prometheus is seeing these metrics
+```
+   kubectl port-forward -n monitoring svc/prom-kube-prometheus-stack-prometheus 9090:9090   
+   promtool query instant http://localhost:9090 'fastapi_inprogress_requests_total'
+```
 
 ### Access Kueue Metrics
 1. Rationale: The Kueue metrics are considered *external* metrics for HPA to scale backend jobs.  
@@ -145,12 +150,19 @@ kubectl delete jobs --all
       prom-kube-prometheus-stack-prometheus         ClusterIP   10.96.12.222    <none>        9090/TCP,8080/TCP   5d10h
       ```
    2. Check/Modify default url in `values.yaml`. Prometheus url would be in the format service-name.namespace.svc, so in my cluster prom-kube-prometheus-stack-prometheus is in monitoring namespace, hence the service url would be `prom-kube-prometheus-stack-prometheus.monitoring.svc`
-   3. 
+   3. Install `prometheus-adapter` helm chart with our values.yaml
+      ```
+      helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      helm repo update
+      helm install prom-adapter prometheus-community/prometheus-adapter -f values.yaml
+      ```
+   4. Check the custom and external metrics are available from Kubernetes API server
+      ```
+      kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq | grep fastapi
+      kubectl get --raw /apis/external.metrics.k8s.io/v1beta1 | jq | grep kueue
+      ```
+4. Configure the HPA
 
-
-```
-helm install --name my-release -f values.yaml stable/prometheus-adapter
-```
 
 ### Cluster Autoscaler
 

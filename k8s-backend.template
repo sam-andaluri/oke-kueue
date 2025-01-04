@@ -110,5 +110,5 @@ spec:
   endpoints:
     - targetPort: 8081
       interval: 15s
-      path: /metrics
+      path: /metrics/
 
