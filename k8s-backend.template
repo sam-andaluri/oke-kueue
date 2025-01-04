@@ -92,3 +92,23 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: backend-kueue
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-kueue-service-monitor
+  labels:
+    app: backend-kueue
+    release: kube-prometheus-stack-prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app: backend-kueue
+  namespaceSelector:
+    matchNames:
+      - default 
+  endpoints:
+    - targetPort: 8081
+      interval: 15s
+      path: /metrics
+

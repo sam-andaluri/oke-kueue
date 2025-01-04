@@ -1,5 +1,5 @@
 [project]
-name = "fastapi-oke-kueue"
+name = "oke-kueue"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -9,6 +9,7 @@ dependencies = [
     "gunicorn==22.0.0",
     "kubernetes==26.1.0",
     "prometheus-client>=0.21.1",
+    "prometheus-fastapi-instrumentator>=6.1.0",
     "requests>=2.32.3",
     "urllib3>=2.3.0",
     "uvicorn==0.22.0",

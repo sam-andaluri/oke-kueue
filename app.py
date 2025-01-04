@@ -8,13 +8,21 @@ import re
 import logging
 import sys
 import os
+from prometheus_client import make_asgi_app, Gauge
+import time
 
 TOKEN_TTL = 3600
 METRIC_TTL = 60
 SERVICE_URL = "https://kueue-controller-manager-metrics-service.kueue-system.svc.cluster.local:8443/metrics"
 METRIC_PATTERN = r'kueue_pending_workloads\{cluster_queue="cluster-queue",status="active"\}'
 
-app = FastAPI()
+app = FastAPI(debug=True)
+
+# Add prometheus asgi middleware to route /metrics requests
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
+g = Gauge('fastapi_inprogress_requests_total', 'Current inprogress requests for submit-job endpoint')
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -31,6 +39,13 @@ else:
     config.load_kube_config()
 
 batch_v1 = client.BatchV1Api()
+
+def consume_cpu(seconds):
+    start_time = time.time()
+    while time.time() - start_time < seconds:
+        result = 0
+        for i in range(1000000):
+            result += i
 
 # Get service account token, keep it in cache for 60 seconds to reduce file reads
 @cached(cache=TTLCache(maxsize=1, ttl=TOKEN_TTL))  
@@ -123,8 +138,10 @@ def health_check():
 # Submit a job to the local queue
 # Added FastAPI endpoint to submit a job to the local queue for testing purposes
 @app.post("/submit-job")
+@g.track_inprogress()
 def submit_job(queue_name: str = "local-queue", job_prefix: str = "job-"):    
-    logger.info("Received metric data: %d", get_prometheus_metric())
+    logger.info("Received kueue_pending_workloads: %d", get_prometheus_metric())
+    consume_cpu(15)
     job = client.V1Job(
         api_version="batch/v1",
         kind="Job",

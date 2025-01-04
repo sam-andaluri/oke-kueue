@@ -1,11 +1,17 @@
-### Pre-requisites 
-1. Install podman `brew install podman` ( MacOS )
-2. Install kubectl `curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/arm64/kubectl;chmod +x kubectl;sudo mv kubectl /usr/local/bin/`
-3. Create a container registry in OCI Console. Get regional OCIR endpoint e.g. phx.ocir.io
-4. Create an auth token in OCI Console.
-5. Login to phx.ocir.io using `podman login phx.ocir.io`. User name is <tenancy>/<OCI-user-name> e..g hpc_limited_availability/sam
-6. Create an OKE cluster and download kubeconfig
-7. Install krew for plugin management `https://krew.sigs.k8s.io/docs/user-guide/setup/install/`
+### Pre-requisites (assuming a macbook)
+1. Install podman `brew install podman` 
+2. Install yq `brew install yq`
+3. Install jq `brew install jq`
+4. Install promtool `brew install prometheus`
+5. Install helm `brew install helm`
+6. Install kubectl `curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/arm64/kubectl;chmod +x kubectl;sudo mv kubectl /usr/local/bin/`
+7. Create a container registry in OCI Console. Get regional OCIR endpoint e.g. phx.ocir.io
+8. Create an auth token in OCI Console.
+9. Login to phx.ocir.io using `podman login phx.ocir.io`. User name is <tenancy>/<OCI-user-name> e..g hpc_limited_availability/sam
+10. Create an OKE cluster and download kubeconfig. `chmod 600 /Users/<user>/.kube/config` to make kubeconfig only read/writable for you.
+11. Install krew for plugin management `https://krew.sigs.k8s.io/docs/user-guide/setup/install/`
+12. Install Kustomize for patching manifests `curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash`
+
 
 ### Install kueue and dependencies
 1. Install kueue `kubectl apply --server-side -f https://github.com/kubernetes-sigs/kueue/releases/download/v0.10.0/manifests.yaml`
@@ -19,8 +25,9 @@
 2. When adding new or removing dependencies use the following commands as an example
    ```
    #Run this when you cloned this repo first time
+   uv init
    uv pip compile pyproject.toml -o requirements.txt
-   #During active development
+   #During active development (example)
    uv add prometheus_client
    uv remove prometheus-api-client
    uv pip compile pyproject.toml -o requirements.txt
@@ -90,21 +97,36 @@
     job1          Complete   1/1           7s         10s
     ```
 
+
+### Access FastAPI metrics
+1. Rationale: This will be part of our *custom* metrics for HPA to scale FastAPI deployment. The code `make_asgi_app` and `app.mount` are for Prometheus client library to instrument and collect metrics from FastAPI app and exposes them on `/metrics` endpoint.
+2.  Get FastAPI metrics.  
+> The trailing slash after metrics is important to see the FastAPI metrics using curl.
+```
+   curl -s http://$LOADBALANCER_IP/metrics/
+```
+
 ### Access Kueue Metrics
-1. Create a service account which gives access to `/metrics` url `kubectl apply -f metrics-viewer-rbac.yaml`
-2. Create a token from the service account 
+1. Rationale: The Kueue metrics are considered *external* metrics for HPA to scale backend jobs.  
+2. Create a service account which gives access to `/metrics` url `kubectl apply -f metrics-viewer-rbac.yaml`
+3. Create a token from the service account 
 ```
 export TOKEN=`kubectl create token metrics-viewer -n kueue-system`
 ```
-3. Port forward the metrics service
+4. Port forward the metrics service
 ```
 kubectl port-forward -n kueue-system svc/kueue-controller-manager-metrics-service 8443:8443
 ```
-4. Open another terminal tab/window and run
+5. Open another terminal tab/window and run
 ```
 curl -k https://localhost:8443/metrics -H "Authorization: Bearer $TOKEN"
 ```
-5. See `app.py` file and `get_prometheus_metric` method for an example that accesses the metrics programmatically. This file also includes a method `create_deployment` for creating a deployment and `scale_deployment` for writing custom scaling algorithm.
+6. See `app.py` file and `get_prometheus_metric` method for an example that accesses the metrics programmatically. This file also includes a method `create_deployment` for creating a deployment and `scale_deployment` for writing custom scaling algorithm.
+7. Check the `kueue` metrics are available via `prometheus`. Don't use `curl http://localhost:9090/metrics` which does not show metrics from exporters like kueue. Use promtool to get scraped metrics.
+```
+   kubectl port-forward -n monitoring svc/prom-kube-prometheus-stack-prometheus 9090:9090   
+   promtool query instant http://localhost:9090 'kueue_pending_workloads'
+```
 
 ### Cleanup workloads and jobs
 ```
@@ -115,8 +137,20 @@ kubectl delete jobs --all
 ### Horizontal Pod Autoscaler (HPA) integration
 ![diagram](images/HPACustomMetrics.png)
 1. Use the above diagram understand the flow and identify the changes. The :x: mark in the diagram indicates components we need to configure. The :heavy_check_mark: in the diagram indicates configuration that was included in the install steps.
-2. Clone prometheus-operator https://github.com/prometheus-operator/kube-prometheus.git and make change to this file  https://github.com/prometheus-operator/kube-prometheus/blob/5f0e7a6eee2fc91509a35fb2cce7989cd1bf7c9c/manifests/prometheus-prometheus.yaml#L48
-3. Clone prometheus-adapter repo `git clone https://github.com/kubernetes-sigs/prometheus-adapter.git` and make change to this file https://github.com/kubernetes-sigs/prometheus-adapter/blob/c2ae4cdaf160363151f746e253789af89f8b6c49/deploy/manifests/config-map.yaml#L3 using an example from https://github.com/kubernetes-sigs/prometheus-adapter/blob/c2ae4cdaf160363151f746e253789af89f8b6c49/docs/sample-config.yaml#L70
+2. From the diagram, the missing piece is `prometheus-adapter` that scrapes metrics from prometheus endpoint and makes them available via API Server.
+3. Configure prometheus-adapter
+   1. Find prometheus service in your cluster. In my cluster the prometheus service name is `prom-kube-prometheus-stack-prometheus`. 
+      ```
+      kubectl get svc -n monitoring
+      prom-kube-prometheus-stack-prometheus         ClusterIP   10.96.12.222    <none>        9090/TCP,8080/TCP   5d10h
+      ```
+   2. Check/Modify default url in `values.yaml`. Prometheus url would be in the format service-name.namespace.svc, so in my cluster prom-kube-prometheus-stack-prometheus is in monitoring namespace, hence the service url would be `prom-kube-prometheus-stack-prometheus.monitoring.svc`
+   3. 
+
+
+```
+helm install --name my-release -f values.yaml stable/prometheus-adapter
+```
 
 ### Cluster Autoscaler
 
@@ -129,7 +163,6 @@ kubectl delete jobs --all
 2. Kueue job example https://kueue.sigs.k8s.io/docs/tasks/run/python_jobs/
 3. Install krew plugin manager https://krew.sigs.k8s.io/docs/user-guide/setup/install/
 4. kueuectl https://kueue.sigs.k8s.io/docs/reference/kubectl-kueue/installation/
-5. Prometheus Adapter configuration walkthru https://github.com/kubernetes-sigs/prometheus-adapter/blob/master/docs/config-walkthrough.md
-6. Prometheus Adapter configuration reference https://github.com/kubernetes-sigs/prometheus-adapter/blob/master/docs/config.md
 7. External metrics https://github.com/kubernetes-sigs/prometheus-adapter/blob/master/docs/externalmetrics.md
 8. Kueue metrics https://kueue.sigs.k8s.io/docs/reference/metrics/#optional-metrics
+9. Prometheus community helm charts https://github.com/prometheus-community
