@@ -141,8 +141,9 @@ kubectl delete jobs --all
 
 ### Horizontal Pod Autoscaler (HPA) integration
 
-#### Custom metrics
 ![diagram](images/HPACustomMetrics.png)
+
+#### Custom metrics
 1. Use the above diagram understand the flow and identify the changes. The :x: mark in the diagram indicates components we need to configure. The :heavy_check_mark: in the diagram indicates configuration that was included in the install steps.
 2. From the diagram, the missing piece is `prometheus-adapter` that scrapes metrics from prometheus endpoint and makes them available via API Server.
 3. Configure prometheus-adapter
