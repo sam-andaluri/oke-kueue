@@ -140,6 +140,8 @@ kubectl delete jobs --all
 ``` 
 
 ### Horizontal Pod Autoscaler (HPA) integration
+
+#### Custom metrics
 ![diagram](images/HPACustomMetrics.png)
 1. Use the above diagram understand the flow and identify the changes. The :x: mark in the diagram indicates components we need to configure. The :heavy_check_mark: in the diagram indicates configuration that was included in the install steps.
 2. From the diagram, the missing piece is `prometheus-adapter` that scrapes metrics from prometheus endpoint and makes them available via API Server.
@@ -161,7 +163,51 @@ kubectl delete jobs --all
       kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq | grep fastapi
       kubectl get --raw /apis/external.metrics.k8s.io/v1beta1 | jq | grep kueue
       ```
-4. Configure the HPA
+4. Configure the HPA using `fastapi-hpa.yaml`. The metric.name should match name.as in `values.yaml` from step 3.
+5. Deploy HPA `kubectl apply -f fastapi-hpa.yaml`
+6. Describe the HPA to check if it can grab the custom metric
+   ```
+   kubectl describe hpa fastapi-hpa
+   Name:                               fastapi-hpa
+   Namespace:                          default
+   Labels:                             <none>
+   Annotations:                        <none>
+   CreationTimestamp:                  Sat, 11 Jan 2025 07:45:24 -0500
+   Reference:                          Deployment/backend-kueue
+   Metrics:                            ( current / target )
+   "fastapi_custom_metric" on pods:  0 / 2
+   Min replicas:                       1
+   Max replicas:                       10
+   Deployment pods:                    1 current / 1 desired
+   Conditions:
+   Type            Status  Reason            Message
+   ----            ------  ------            -------
+   AbleToScale     True    ReadyForNewScale  recommended size matches current size
+   ScalingActive   True    ValidMetricFound  the HPA was able to successfully calculate a replica count from pods metric fastapi_custom_metric
+   ScalingLimited  True    TooFewReplicas    the desired replica count is less than the minimum replica count
+   Events:           <none>
+   ```
+7. Get HPA status, see the TARGETS columns where it should show current metric based scaling decision and the target.
+   ```
+   kubectl get hpa
+   NAME          REFERENCE                  TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+   fastapi-hpa   Deployment/backend-kueue   0/2       1         10        1          25s
+   ```
+8. Test HPA by running a load test `./submit-job-loadtest.sh`
+9. Check status of HPA to scaling
+   ```
+   #Before
+   kubectl get hpa
+   NAME          REFERENCE                  TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+   fastapi-hpa   Deployment/backend-kueue   10/2      1         10        1          102s
+
+   #After
+   kubectl get hpa
+   NAME          REFERENCE                  TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+   fastapi-hpa   Deployment/backend-kueue   0/2       1         10        4          111s
+
+   ```
+#### External metrics
 
 
 ### Cluster Autoscaler
