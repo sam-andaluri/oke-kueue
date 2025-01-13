@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # Default values
-NUM_REQUESTS=10
+NUM_REQUESTS=100
 ENDPOINT="http://$LOADBALANCER_IP/submit-job"
 
 # Make parallel requests

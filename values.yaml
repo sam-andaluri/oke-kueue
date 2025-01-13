@@ -23,5 +23,5 @@ rules:
       name:
         matches: ""
         as: "kueue_external_metric"
-      metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)
+      metricsQuery: sum(<<.Series>>) by (<<.GroupBy>>)
 

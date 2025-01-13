@@ -46,6 +46,7 @@ def consume_cpu(seconds):
         result = 0
         for i in range(1000000):
             result += i
+    return result
 
 # Get service account token, keep it in cache for 60 seconds to reduce file reads
 @cached(cache=TTLCache(maxsize=1, ttl=TOKEN_TTL))  
@@ -92,6 +93,7 @@ def get_prometheus_metric(metric_name: str="kueue_pending_workloads", url: str =
         return None
 
 # Create a deployment with a sleep job (representing a workload that needs to be scaled on a queue metric)
+@app.post("/create-deployment")
 def create_deployment(deployment_name: str="dummy-sleep-job", replicas: int=1):
     apps_v1 = client.AppsV1Api()
     deployment = client.V1Deployment(
@@ -109,9 +111,13 @@ def create_deployment(deployment_name: str="dummy-sleep-job", replicas: int=1):
                     containers=[
                         client.V1Container(
                             name="dummy",
-                            image="gcr.io/k8s-staging-perf-tests/sleep:v0.1.0",
-                            args=["30s"],
-                            ports=[client.V1ContainerPort(container_port=80)]
+                            image="busybox",
+                            command=["sleep", "600"],
+                            ports=[client.V1ContainerPort(container_port=80)],
+                            resources=client.V1ResourceRequirements(
+                                limits={"cpu": "100m", "memory": "100Mi"},
+                                requests={"cpu": "100m", "memory": "100Mi"}
+                            )
                         )
                     ]
                 )
@@ -121,6 +127,7 @@ def create_deployment(deployment_name: str="dummy-sleep-job", replicas: int=1):
     apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
 
 # Scale the dummy deployment
+@app.post("/scale-deployment")
 def scale_deployment(deployment_name: str="dummy-sleep-job", replicas: int=2):
     apps_v1 = client.AppsV1Api()
     deployment = apps_v1.read_namespaced_deployment(name=deployment_name, namespace="default")
@@ -140,8 +147,7 @@ def health_check():
 @app.post("/submit-job")
 @g.track_inprogress()
 def submit_job(queue_name: str = "local-queue", job_prefix: str = "job-"):    
-    logger.info("Received kueue_pending_workloads: %d", get_prometheus_metric())
-    consume_cpu(15)
+    logger.info("Received kueue_pending_workloads: %d", get_prometheus_metric())    
     job = client.V1Job(
         api_version="batch/v1",
         kind="Job",
@@ -164,9 +170,8 @@ def submit_job(queue_name: str = "local-queue", job_prefix: str = "job-"):
                     restart_policy="Never"
                 )
             )
-        )
+        )        
     )
-
     response = batch_v1.create_namespaced_job(namespace="default", body=job)
     return {"status": "submitted", "queue": queue_name, "job": response.metadata.name}
 

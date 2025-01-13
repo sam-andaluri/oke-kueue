@@ -158,11 +158,14 @@ kubectl delete jobs --all
       helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
       helm repo update
       helm install prom-adapter prometheus-community/prometheus-adapter -f values.yaml
+      #if values.yaml changes
+      #helm upgrade -f values.yaml prom-adapter prometheus-community/prometheus-adapter
       ```
    4. Check the custom and external metrics are available from Kubernetes API server
       ```
       kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq | grep fastapi
       kubectl get --raw /apis/external.metrics.k8s.io/v1beta1 | jq | grep kueue
+      kubectl get --raw /apis/external.metrics.k8s.io/v1beta1/namespaces/default/kueue_external_metric | jq
       ```
 4. Configure the HPA using `fastapi-hpa.yaml`. The metric.name should match name.as in `values.yaml` from step 3.
 5. Deploy HPA `kubectl apply -f fastapi-hpa.yaml`
