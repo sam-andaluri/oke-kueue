@@ -22,7 +22,7 @@ fastapi==0.103.2
     #   prometheus-fastapi-instrumentator
 google-auth==2.37.0
     # via kubernetes
-gunicorn==22.0.0
+gunicorn==23.0.0
     # via oke-kueue (pyproject.toml)
 h11==0.14.0
     # via uvicorn

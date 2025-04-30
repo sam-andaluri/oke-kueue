@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi==0.103.2",
-    "gunicorn==22.0.0",
+    "gunicorn==23.0.0",
     "kubernetes==26.1.0",
     "prometheus-client>=0.21.1",
     "prometheus-fastapi-instrumentator>=6.1.0",
