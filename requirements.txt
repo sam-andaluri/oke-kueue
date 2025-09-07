@@ -65,7 +65,7 @@ requests-oauthlib==2.0.0
     # via kubernetes
 rsa==4.9
     # via google-auth
-setuptools==75.6.0
+setuptools==78.1.1
     # via kubernetes
 six==1.17.0
     # via
